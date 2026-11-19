@@ -54,17 +54,40 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void newChat() => open(null);
+  void newChat() {
+    pending = ChatParams();
+    open(null);
+  }
 
+  /// Options for the next new chat (before it has a [Conversation]).
+  ChatParams pending = ChatParams();
+
+  /// Options of the open chat, or of the chat about to be created.
+  ChatParams get params => current?.params ?? pending;
+
+  /// Call after mutating [params].
+  void saveParams() {
+    final c = current;
+    if (c != null) _save(c);
+    notifyListeners();
+  }
+
+  PromptPreset? promptFor(ChatParams p) =>
+      settings.prompts.where((x) => x.id == p.promptId).firstOrNull;
+
+  void setPrompt(String? id) {
+    params.promptId = id;
+    saveParams();
+  }
+
+  /// Pinned chats first, then most recently updated.
   List<Conversation> filter(String query, {bool archived = false}) {
     final q = query.trim().toLowerCase();
-    final base = conversations.where((c) => c.archived == archived);
-    if (q.isEmpty) return base.toList();
-    return base
-        .where((c) =>
-            c.title.toLowerCase().contains(q) ||
-            c.messages.any((m) => m.content.toLowerCase().contains(q)))
-        .toList();
+    final base = conversations.where((c) => c.archived == archived).where((c) =>
+        q.isEmpty ||
+        c.title.toLowerCase().contains(q) ||
+        c.messages.any((m) => m.content.toLowerCase().contains(q)));
+    return [...base.where((c) => c.pinned), ...base.where((c) => !c.pinned)];
   }
 
   int get archivedCount => conversations.where((c) => c.archived).length;
@@ -74,19 +97,44 @@ class AppStore extends ChangeNotifier {
 
   // ------------------------------------------------------------------ chat
 
-  String? get modelLabel => settings.provider == null ? null : settings.model;
-  bool get ready => settings.provider != null && (settings.model ?? '').isNotEmpty;
+  /// The provider and model a chat uses: its own choice when still
+  /// configured, otherwise the global default.
+  (Provider, String)? modelFor(Conversation? c) {
+    if (c != null && c.providerId != null) {
+      final p = settings.providers.where((p) => p.id == c.providerId).firstOrNull;
+      if (p != null && p.models.contains(c.model)) return (p, c.model!);
+    }
+    final p = settings.provider;
+    final m = settings.model;
+    if (p == null || m == null || m.isEmpty) return null;
+    return (p, m);
+  }
 
-  Future<void> send(String text, {List<Attachment> attachments = const []}) async {
+  String? get modelLabel => modelFor(current)?.$2;
+  bool get ready => modelFor(current) != null;
+
+  Future<void> send(String text, {List<Attachment> attachments = const [], String quote = ''}) async {
     text = text.trim();
-    if ((text.isEmpty && attachments.isEmpty) || running != null || !ready) return;
-    final provisional = text.isNotEmpty ? _shortTitle(text) : _shortTitle(attachments.first.name);
-    final c = current ?? Conversation(title: provisional);
+    quote = quote.trim();
+    if ((text.isEmpty && attachments.isEmpty && quote.isEmpty) || running != null || !ready) return;
+    final provisional = text.isNotEmpty
+        ? _shortTitle(text)
+        : attachments.isNotEmpty
+            ? _shortTitle(attachments.first.name)
+            : _shortTitle(quote);
+    final c = current ?? Conversation(title: provisional, params: pending);
     if (current == null) {
+      final m = modelFor(null)!;
+      c
+        ..providerId = m.$1.id
+        ..model = m.$2;
       conversations.insert(0, c);
       current = c;
+      pending = ChatParams();
     }
-    c.messages.add(Message(Role.user, text)..attachments = List.of(attachments));
+    c.messages.add(Message(Role.user, text)
+      ..attachments = List.of(attachments)
+      ..quote = quote);
     await _reply(c);
   }
 
@@ -101,13 +149,72 @@ class AppStore extends ChangeNotifier {
     await _reply(c);
   }
 
+  /// Replaces the text of a user message, drops everything after it and asks again.
+  Future<void> editAndResend(Message m, String text) async {
+    final c = current;
+    if (c == null || running != null || !ready || m.role != Role.user) return;
+    final i = c.messages.indexOf(m);
+    if (i < 0) return;
+    text = text.trim();
+    if (text.isEmpty && m.attachments.isEmpty && m.quote.isEmpty) return;
+    m
+      ..content = text
+      ..time = DateTime.now();
+    c.messages.removeRange(i + 1, c.messages.length);
+    await _reply(c);
+  }
+
+  /// Answers again from the user message that led to [m].
+  Future<void> regenerate(Message m) async {
+    final c = current;
+    if (c == null || running != null || !ready) return;
+    final i = c.messages.indexOf(m);
+    if (i < 0) return;
+    final userIdx = c.messages.sublist(0, i + 1).lastIndexWhere((x) => x.role == Role.user);
+    if (userIdx < 0) return;
+    c.messages.removeRange(userIdx + 1, c.messages.length);
+    await _reply(c);
+  }
+
+  /// Copies the chat up to and including [m] into a new chat and opens it.
+  Conversation? branch(Message m) {
+    final c = current;
+    if (c == null) return null;
+    final i = c.messages.indexOf(m);
+    if (i < 0) return null;
+    final copy = Conversation(title: '${c.title} · 分支', params: c.params.copy())
+      ..providerId = c.providerId
+      ..model = c.model
+      ..messages = [
+        for (final x in c.messages.sublist(0, i + 1))
+          Message.fromJson(jsonDecode(jsonEncode(x.toJson())))
+      ];
+    conversations.insert(0, copy);
+    current = copy;
+    _save(copy);
+    _saveIndex();
+    notifyListeners();
+    return copy;
+  }
+
+  /// Turns a question and an answer (from model comparison) into a new chat.
+  Conversation startFrom(String question, Message answer, Provider p, String model) {
+    final c = Conversation(title: _shortTitle(question))
+      ..providerId = p.id
+      ..model = model
+      ..messages = [Message(Role.user, question), answer];
+    conversations.insert(0, c);
+    current = c;
+    _touch(c);
+    return c;
+  }
+
   void stop() {
     if (_abort?.isCompleted == false) _abort!.complete();
   }
 
   Future<void> _reply(Conversation c) async {
-    final provider = settings.provider!;
-    final model = settings.model!;
+    final (provider, model) = modelFor(c)!;
     final firstReply = c.messages.where((m) => m.role == Role.user).length == 1;
     running = c;
     _abort = Completer<void>();
@@ -124,15 +231,17 @@ class AppStore extends ChangeNotifier {
           await for (final t in llm.chat(
             provider: provider,
             model: model,
-            system: systemPrompt(),
+            system: systemPrompt(c),
             history: c.messages.sublist(0, c.messages.length - 1),
             tools: useTools ? tools.map((t) => t.spec).toList() : const [],
+            params: c.params,
             abort: _abort!.future,
           )) {
             turn = t;
             msg
               ..content = t.text
               ..reasoning = t.reasoning
+              ..signature = t.signature
               ..inputTokens = t.inputTokens
               ..outputTokens = t.outputTokens;
             notifyListeners();
@@ -223,7 +332,8 @@ class AppStore extends ChangeNotifier {
 
   // ---------------------------------------------------------------- memory
 
-  String systemPrompt() {
+  String systemPrompt([Conversation? chat]) {
+    final role = promptFor(chat?.params ?? params);
     final now = DateTime.now();
     final off = now.timeZoneOffset;
     final tz = 'UTC${off.isNegative ? '-' : '+'}${off.inHours.abs().toString().padLeft(2, '0')}:'
@@ -236,6 +346,15 @@ class AppStore extends ChangeNotifier {
       b
         ..writeln('\n# User instructions')
         ..writeln(settings.instructions.trim());
+    }
+    if (role != null && role.content.trim().isNotEmpty) {
+      b
+        ..writeln('\n# Role for this chat: ${role.name}')
+        ..writeln(role.content.trim());
+    }
+    if (settings.agent && settings.webSearch) {
+      b.writeln('\nCall `web_search` for recent events or facts you are unsure about, '
+          'then `read_url` for details. Cite the URLs you used.');
     }
     if (settings.memory) {
       b.writeln('\n# Memory about the user (persists across chats)');
@@ -320,6 +439,56 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void togglePin(Conversation c) {
+    c.pinned = !c.pinned;
+    _save(c);
+    notifyListeners();
+  }
+
+  /// Renders a chat as Markdown for sharing.
+  String exportMarkdown(Conversation c) {
+    String fmt(DateTime? t) => t == null ? '' : t.toString().substring(0, 16);
+    final m = modelFor(c);
+    final b = StringBuffer()
+      ..writeln('# ${c.title.isEmpty ? '新对话' : c.title}')
+      ..writeln()
+      ..writeln('> ${[if (m != null) '${m.$1.name} · ${m.$2}', fmt(c.updated)].join(' · ')}')
+      ..writeln();
+    final role = promptFor(c.params);
+    if (role != null) b..writeln('> 角色：${role.name}')..writeln();
+    for (final x in c.messages) {
+      if (x.role == Role.user) {
+        b..writeln('## 🧑 用户  ${fmt(x.time)}')..writeln();
+        if (x.quote.isNotEmpty) {
+          b..writeln(x.quote.trim().split('\n').map((l) => '> $l').join('\n'))..writeln();
+        }
+        for (final a in x.attachments) {
+          b.writeln('📎 ${a.name}');
+        }
+        if (x.attachments.isNotEmpty) b.writeln();
+        if (x.content.isNotEmpty) b..writeln(x.content)..writeln();
+      } else {
+        if (x.content.isEmpty && x.calls.isEmpty) continue;
+        b..writeln('## 🤖 助手  ${fmt(x.time)}')..writeln();
+        if (x.reasoning.isNotEmpty) {
+          b
+            ..writeln('<details><summary>思考过程</summary>')
+            ..writeln()
+            ..writeln(x.reasoning)
+            ..writeln()
+            ..writeln('</details>')
+            ..writeln();
+        }
+        for (final call in x.calls) {
+          b.writeln('> 🔧 `${call.name}` ${call.args}');
+        }
+        if (x.calls.isNotEmpty) b.writeln();
+        if (x.content.isNotEmpty) b..writeln(x.content)..writeln();
+      }
+    }
+    return b.toString();
+  }
+
   void toggleArchive(Conversation c) {
     c.archived = !c.archived;
     if (c.archived && current == c) current = null;
@@ -377,10 +546,18 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the global default and, when a chat is open, that chat's model.
   void selectModel(Provider p, String model) {
     settings
       ..providerId = p.id
       ..model = model;
+    final c = current;
+    if (c != null) {
+      c
+        ..providerId = p.id
+        ..model = model;
+      _save(c);
+    }
     saveSettings();
   }
 

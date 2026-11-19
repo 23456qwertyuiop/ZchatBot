@@ -119,7 +119,10 @@ class _MarkdownViewState extends State<MarkdownView> {
           ],
         );
       case 'pre':
-        return _CodeBlock(e.textContent.trimRight(), _mono);
+        final code = (e.children ?? const []).whereType<md.Element>().firstOrNull;
+        final cls = code?.attributes['class'] ?? '';
+        final lang = cls.startsWith('language-') ? cls.substring(9) : '';
+        return _CodeBlock(e.textContent.trimRight(), lang, _mono);
       case 'blockquote':
         return Container(
           padding: const EdgeInsets.only(left: 14),
@@ -228,38 +231,166 @@ class _MarkdownViewState extends State<MarkdownView> {
   }
 }
 
-class _CodeBlock extends StatelessWidget {
-  const _CodeBlock(this.code, this.mono);
+class _CodeBlock extends StatefulWidget {
+  const _CodeBlock(this.code, this.lang, this.mono);
   final String code;
+  final String lang;
   final TextStyle mono;
+
+  @override
+  State<_CodeBlock> createState() => _CodeBlockState();
+}
+
+class _CodeBlockState extends State<_CodeBlock> {
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.code));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _copied = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final base = widget.mono.copyWith(fontSize: 13.5, height: 1.5, color: cs.onSurface);
     return Container(
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Stack(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Container(
+            color: cs.surfaceContainerHighest,
+            padding: const EdgeInsets.fromLTRB(16, 2, 4, 2),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.lang.isEmpty ? 'code' : widget.lang,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: cs.onSurfaceVariant,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: _copy,
+                  icon: Icon(_copied ? Icons.check_rounded : Icons.content_copy_rounded, size: 16),
+                  label: Text(_copied ? '已复制' : '复制'),
+                ),
+              ],
+            ),
+          ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 14, 48, 14),
-            child: Text(code, style: mono.copyWith(fontSize: 13.5, height: 1.5, color: cs.onSurface)),
-          ),
-          Positioned(
-            top: 4,
-            right: 4,
-            child: IconButton(
-              iconSize: 18,
-              icon: const Icon(Icons.content_copy_rounded),
-              color: cs.onSurfaceVariant,
-              onPressed: () => Clipboard.setData(ClipboardData(text: code)),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            child: Text.rich(
+              TextSpan(style: base, children: highlightCode(widget.code, widget.lang, dark)),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+// ------------------------------------------------------------- highlighting
+
+const _keywords = {
+  // C family, Java, JS/TS, Dart, Go, Rust, Swift, Kotlin, C#
+  'abstract', 'as', 'async', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue',
+  'default', 'defer', 'do', 'else', 'enum', 'export', 'extends', 'extension', 'final', 'finally',
+  'for', 'func', 'fn', 'fun', 'function', 'go', 'goto', 'if', 'impl', 'implements', 'import', 'in',
+  'interface', 'is', 'late', 'let', 'match', 'mixin', 'mod', 'module', 'mut', 'namespace', 'new',
+  'override', 'package', 'private', 'protected', 'pub', 'public', 'required', 'return', 'sealed',
+  'select', 'static', 'struct', 'super', 'switch', 'this', 'throw', 'throws', 'trait', 'try',
+  'type', 'typedef', 'typeof', 'use', 'val', 'var', 'void', 'when', 'where', 'while', 'with',
+  'yield', 'chan', 'range', 'unsafe', 'readonly', 'declare', 'keyof', 'instanceof',
+  'delete', 'of', 'from', 'operator', 'inline', 'virtual', 'template', 'typename',
+  'using', 'guard', 'protocol', 'self', 'Self',
+  // Python, Ruby, shell
+  'and', 'or', 'not', 'def', 'del', 'elif', 'except', 'global', 'lambda', 'nonlocal', 'pass',
+  'raise', 'assert', 'end', 'then', 'fi', 'esac', 'done', 'echo', 'local', 'unless', 'until',
+  'begin', 'rescue', 'ensure', 'elsif', 'require',
+  // SQL
+  'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE',
+  'TABLE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'GROUP', 'BY', 'ORDER', 'LIMIT',
+  'AND', 'OR', 'NOT', 'NULL', 'AS', 'DISTINCT', 'HAVING', 'PRIMARY', 'KEY', 'INDEX', 'DROP',
+  'ALTER', 'UNION', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'IS', 'IN', 'LIKE',
+  // literals
+  'true', 'false', 'null', 'nil', 'None', 'True', 'False', 'undefined', 'NaN',
+};
+
+const _hashComments = {
+  'python', 'py', 'sh', 'bash', 'shell', 'zsh', 'console', 'yaml', 'yml', 'toml', 'ruby', 'rb',
+  'r', 'perl', 'makefile', 'make', 'dockerfile', 'ini', 'conf', 'powershell', 'ps1', 'nginx',
+};
+const _dashComments = {'sql', 'lua', 'haskell', 'hs'};
+const _markupComments = {'html', 'xml', 'svg', 'vue', 'markdown', 'md'};
+
+// Strings: triple-quoted, double, single and backtick literals.
+const _stringPattern = r'"""[\s\S]*?"""|' r"'''[\s\S]*?'''|" r'"(?:\\.|[^"\\\n])*"|'
+    r"'(?:\\.|[^'\\\n])*'|" r'`(?:\\.|[^`\\])*`';
+const _numberPattern = r'\b(?:0[xX][0-9a-fA-F]+|\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?)\b';
+const _wordPattern = r'[A-Za-z_$][\w$]*';
+
+/// A small, dependency-free highlighter good enough for chat answers.
+List<TextSpan> highlightCode(String code, String lang, bool dark) {
+  final l = lang.toLowerCase();
+  final keyword = dark ? const Color(0xFFFF7B72) : const Color(0xFFCF222E);
+  final string = dark ? const Color(0xFFA5D6FF) : const Color(0xFF0A3069);
+  final number = dark ? const Color(0xFF79C0FF) : const Color(0xFF0550AE);
+  final comment = dark ? const Color(0xFF8B949E) : const Color(0xFF6E7781);
+  final function = dark ? const Color(0xFFD2A8FF) : const Color(0xFF8250DF);
+  final type = dark ? const Color(0xFFFFA657) : const Color(0xFF953800);
+
+  final hash = _hashComments.contains(l);
+  final dash = _dashComments.contains(l);
+  final comments = <String>[
+    if (!hash && !dash) r'//[^\n]*',
+    if (!hash) r'/\*[\s\S]*?\*/',
+    if (hash) r'#[^\n]*',
+    if (dash) r'--[^\n]*',
+    if (_markupComments.contains(l)) r'<!--[\s\S]*?-->',
+  ];
+  final re = RegExp('(?<c>${comments.join('|')})|(?<s>$_stringPattern)|(?<n>$_numberPattern)|(?<w>$_wordPattern)');
+
+  final out = <TextSpan>[];
+  var last = 0;
+  for (final m in re.allMatches(code)) {
+    if (m.end == m.start) continue;
+    if (m.start > last) out.add(TextSpan(text: code.substring(last, m.start)));
+    final text = m.group(0)!;
+    Color? color;
+    var italic = false;
+    if (m.namedGroup('c') != null) {
+      color = comment;
+      italic = true;
+    } else if (m.namedGroup('s') != null) {
+      color = string;
+    } else if (m.namedGroup('n') != null) {
+      color = number;
+    } else if (_keywords.contains(text)) {
+      color = keyword;
+    } else if (m.end < code.length && code[m.end] == '(') {
+      color = function;
+    } else if (text.length > 1 && RegExp(r'^[A-Z]').hasMatch(text)) {
+      color = type;
+    }
+    out.add(TextSpan(
+      text: text,
+      style: color == null ? null : TextStyle(color: color, fontStyle: italic ? FontStyle.italic : null),
+    ));
+    last = m.end;
+  }
+  if (last < code.length) out.add(TextSpan(text: code.substring(last)));
+  return out;
 }

@@ -82,6 +82,18 @@ class SettingsPage extends StatelessWidget {
                       },
                     ),
                     Divider(height: 1, color: cs.outlineVariant),
+                    SwitchListTile(
+                      title: const Text('联网搜索'),
+                      subtitle: const Text('允许模型调用 web_search 查询最新信息（需开启 Agent 工具）'),
+                      value: s.webSearch,
+                      onChanged: s.agent
+                          ? (v) {
+                              s.webSearch = v;
+                              store.saveSettings();
+                            }
+                          : null,
+                    ),
+                    Divider(height: 1, color: cs.outlineVariant),
                     ListTile(
                       title: const Text('系统指令'),
                       trailing: const Icon(Icons.chevron_right),
@@ -96,6 +108,145 @@ class SettingsPage extends StatelessWidget {
                           s.instructions = res.trim();
                           store.saveSettings();
                         }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  _sectionTitle(context, '角色预设 (${s.prompts.length})'),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () async {
+                      final p = await _editPromptDialog(context, PromptPreset(name: '', content: ''), isNew: true);
+                      if (p != null) {
+                        s.prompts.add(p);
+                        store.saveSettings();
+                      }
+                    },
+                  ),
+                ],
+              ),
+              if (s.prompts.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Container(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < s.prompts.length; i++) ...[
+                        if (i > 0) Divider(height: 1, color: cs.outlineVariant),
+                        ListTile(
+                          title: Text(s.prompts[i].name),
+                          subtitle: Text(
+                            s.prompts[i].content,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () async {
+                            if (await _editPromptDialog(context, s.prompts[i]) != null) {
+                              store.saveSettings();
+                            }
+                          },
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () async {
+                              final p = s.prompts[i];
+                              if (await confirm(context, '删除角色「${p.name}」？')) {
+                                s.prompts.remove(p);
+                                store.saveSettings();
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              _sectionTitle(context, '外观'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(value: 'system', label: Text('跟随系统'), icon: Icon(Icons.brightness_auto_outlined)),
+                          ButtonSegment(value: 'light', label: Text('浅色'), icon: Icon(Icons.light_mode_outlined)),
+                          ButtonSegment(value: 'dark', label: Text('深色'), icon: Icon(Icons.dark_mode_outlined)),
+                        ],
+                        selected: {s.themeMode},
+                        onSelectionChanged: (v) {
+                          s.themeMode = v.first;
+                          store.saveSettings();
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('主题色', style: Theme.of(context).textTheme.bodyLarge),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        for (final c in themeSeeds)
+                          InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () {
+                              s.seedColor = c;
+                              store.saveSettings();
+                            },
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Color(c),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: s.seedColor == c ? cs.onSurface : Colors.transparent,
+                                  width: 3,
+                                ),
+                              ),
+                              child: s.seedColor == c
+                                  ? const Icon(Icons.check, size: 18, color: Colors.white)
+                                  : null,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text('字体大小', style: Theme.of(context).textTheme.bodyLarge),
+                        const Spacer(),
+                        Text('${(s.textScale * 100).round()}%',
+                            style: TextStyle(color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                    Slider(
+                      value: s.textScale,
+                      min: 0.85,
+                      max: 1.3,
+                      divisions: 9,
+                      label: '${(s.textScale * 100).round()}%',
+                      onChanged: (v) {
+                        s.textScale = v;
+                        store.saveSettings();
                       },
                     ),
                   ],
@@ -478,5 +629,59 @@ Future<Provider?> _editProviderDialog(BuildContext context, Provider p, {bool is
     urlCtrl.dispose();
     keyCtrl.dispose();
     modelsCtrl.dispose();
+  });
+}
+
+Future<PromptPreset?> _editPromptDialog(BuildContext context, PromptPreset p, {bool isNew = false}) {
+  final nameCtrl = TextEditingController(text: p.name);
+  final contentCtrl = TextEditingController(text: p.content);
+  return showDialog<PromptPreset>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(isNew ? '添加角色' : '编辑角色'),
+      content: SizedBox(
+        width: 480,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 12,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: isNew,
+                decoration: const InputDecoration(labelText: '名称'),
+              ),
+              TextField(
+                controller: contentCtrl,
+                minLines: 5,
+                maxLines: 14,
+                decoration: InputDecoration(
+                  labelText: '系统指令',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(
+          onPressed: () {
+            final name = nameCtrl.text.trim();
+            if (name.isEmpty) return;
+            p
+              ..name = name
+              ..content = contentCtrl.text.trim();
+            Navigator.pop(context, p);
+          },
+          child: const Text('保存'),
+        ),
+      ],
+    ),
+  ).whenComplete(() {
+    nameCtrl.dispose();
+    contentCtrl.dispose();
   });
 }

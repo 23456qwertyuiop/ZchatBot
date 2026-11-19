@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/models.dart';
+import '../core/store.dart';
 import 'common.dart';
 import 'scope.dart';
 import 'settings_page.dart';
@@ -203,6 +208,15 @@ class _ConversationTile extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 6, 6, 6),
             child: Row(
               children: [
+                if (conversation.pinned)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Icon(
+                      Icons.push_pin,
+                      size: 14,
+                      color: selected ? cs.onSecondaryContainer : cs.primary,
+                    ),
+                  ),
                 Expanded(
                   child: Text(
                     title,
@@ -225,6 +239,10 @@ class _ConversationTile extends StatelessWidget {
                     switch (v) {
                       case 'rename':
                         _rename(context, store);
+                      case 'pin':
+                        store.togglePin(conversation);
+                      case 'export':
+                        _export(store);
                       case 'archive':
                         store.toggleArchive(conversation);
                       case 'delete':
@@ -232,7 +250,12 @@ class _ConversationTile extends StatelessWidget {
                     }
                   },
                   itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'pin',
+                      child: Text(conversation.pinned ? '取消置顶' : '置顶'),
+                    ),
                     const PopupMenuItem(value: 'rename', child: Text('重命名')),
+                    const PopupMenuItem(value: 'export', child: Text('导出 Markdown')),
                     PopupMenuItem(
                       value: 'archive',
                       child: Text(conversation.archived ? '取消归档' : '归档'),
@@ -248,6 +271,16 @@ class _ConversationTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _export(AppStore store) async {
+    final name = (conversation.title.isEmpty ? '对话' : conversation.title)
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    await FilePicker.saveFile(
+      fileName: '$name.md',
+      bytes: Uint8List.fromList(utf8.encode(store.exportMarkdown(conversation))),
+      mimeType: 'text/markdown',
     );
   }
 

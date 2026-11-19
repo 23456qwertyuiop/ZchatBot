@@ -18,6 +18,9 @@ class ToolSpec {
 class LlmTurn {
   String _raw = '';
   String _reasoning = '';
+
+  /// Anthropic thinking-block signature.
+  String signature = '';
   final calls = <ToolCall>[];
   int inputTokens = 0;
   int outputTokens = 0;
@@ -62,16 +65,29 @@ class Llm {
     required String system,
     required List<Message> history,
     List<ToolSpec> tools = const [],
+    ChatParams? params,
     Future<void>? abort,
   }) async* {
     final anthropic = provider.protocol == Protocol.anthropic;
     final base = _trim(provider.baseUrl);
     final uri = Uri.parse(anthropic ? '$base/messages' : '$base/chat/completions');
+    final budget = switch (params?.reasoning) {
+      'low' => 2048,
+      'medium' => 8192,
+      'high' => 16384,
+      _ => 0,
+    };
+    // Extended thinking needs max_tokens above the budget and no temperature.
+    final anthropicMax = budget > 0
+        ? ((params?.maxTokens ?? 0) > budget ? params!.maxTokens! : budget + 8192)
+        : (params?.maxTokens ?? 8192);
     final body = anthropic
         ? {
             'model': model,
-            'max_tokens': 8192,
+            'max_tokens': anthropicMax,
             'stream': true,
+            if (budget > 0) 'thinking': {'type': 'enabled', 'budget_tokens': budget},
+            if (budget == 0 && params?.temperature != null) 'temperature': params!.temperature,
             if (system.isNotEmpty) 'system': system,
             'messages': _anthropicMessages(history),
             if (tools.isNotEmpty)
@@ -84,6 +100,9 @@ class Llm {
             'model': model,
             'stream': true,
             'stream_options': {'include_usage': true},
+            if (params?.temperature != null) 'temperature': params!.temperature,
+            if (params?.maxTokens != null) 'max_tokens': params!.maxTokens,
+            if (params?.reasoning != null) 'reasoning_effort': params!.reasoning,
             'messages': _openaiMessages(system, history),
             if (tools.isNotEmpty)
               'tools': [
@@ -182,7 +201,7 @@ class Llm {
       if (m.error) continue;
       if (m.role == Role.user) {
         if (m.attachments.isEmpty) {
-          out.add({'role': 'user', 'content': m.content});
+          out.add({'role': 'user', 'content': m.promptText});
         } else {
           out.add({
             'role': 'user',
@@ -195,7 +214,7 @@ class Llm {
                   }
                 else
                   {'type': 'text', 'text': '[附件: ${a.name}]\n${a.data}'},
-              if (m.content.isNotEmpty) {'type': 'text', 'text': m.content},
+              if (m.promptText.isNotEmpty) {'type': 'text', 'text': m.promptText},
             ],
           });
         }
@@ -245,8 +264,12 @@ class Llm {
             add('user', {'type': 'text', 'text': '[附件: ${a.name}]\n${a.data}'});
           }
         }
-        if (m.content.isNotEmpty) add('user', {'type': 'text', 'text': m.content});
+        if (m.promptText.isNotEmpty) add('user', {'type': 'text', 'text': m.promptText});
         continue;
+      }
+      // A thinking block must precede tool_use when extended thinking is on.
+      if (m.calls.isNotEmpty && m.signature.isNotEmpty) {
+        add('assistant', {'type': 'thinking', 'thinking': m.reasoning, 'signature': m.signature});
       }
       if (m.content.isNotEmpty) add('assistant', {'type': 'text', 'text': m.content});
       for (final c in m.calls) {
@@ -329,6 +352,8 @@ class Llm {
             t._raw += d['text'];
           case 'thinking_delta':
             t._reasoning += d['thinking'];
+          case 'signature_delta':
+            t.signature += d['signature'];
           case 'input_json_delta':
             b[j['index']]?.args += d['partial_json'];
         }
@@ -343,6 +368,10 @@ class Llm {
     }
     for (final c in (j['content'] as List? ?? const [])) {
       if (c['type'] == 'text') t._raw += c['text'];
+      if (c['type'] == 'thinking') {
+        t._reasoning += c['thinking'] ?? '';
+        t.signature = c['signature'] ?? '';
+      }
       if (c['type'] == 'tool_use') {
         t.calls.add(ToolCall(id: c['id'], name: c['name'], args: jsonEncode(c['input'])));
       }
