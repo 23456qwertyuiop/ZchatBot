@@ -150,18 +150,20 @@ class Message {
 }
 
 class Conversation {
-  Conversation({String? id, this.title = '', DateTime? updated})
+  Conversation({String? id, this.title = '', DateTime? updated, this.archived = false})
       : id = id ?? newId(),
         updated = updated ?? DateTime.now();
   final String id;
   String title;
   DateTime updated;
+  bool archived;
   List<Message> messages = [];
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'updated': updated.millisecondsSinceEpoch,
+        if (archived) 'archived': true,
         'messages': messages.map((m) => m.toJson()).toList(),
       };
 
@@ -169,6 +171,7 @@ class Conversation {
         id: j['id'],
         title: j['title'] ?? '',
         updated: DateTime.fromMillisecondsSinceEpoch(j['updated'] ?? 0),
+        archived: j['archived'] ?? false,
       )..messages = [
           for (final m in (j['messages'] as List? ?? const []))
             Message.fromJson(Map<String, dynamic>.from(m))

@@ -20,6 +20,7 @@ class HistoryPanel extends StatefulWidget {
 class _HistoryPanelState extends State<HistoryPanel> {
   final _searchCtrl = TextEditingController();
   String _query = '';
+  bool _showArchived = false;
 
   @override
   void dispose() {
@@ -31,7 +32,9 @@ class _HistoryPanelState extends State<HistoryPanel> {
   Widget build(BuildContext context) {
     final store = Scope.of(context);
     final cs = Theme.of(context).colorScheme;
-    final list = store.filter(_query);
+    final archivedCount = store.archivedCount;
+    if (_showArchived && archivedCount == 0) _showArchived = false;
+    final list = store.filter(_query, archived: _showArchived);
 
     return Container(
       decoration: BoxDecoration(
@@ -41,12 +44,55 @@ class _HistoryPanelState extends State<HistoryPanel> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
+          if (_showArchived)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, size: 20),
+                    onPressed: () => setState(() => _showArchived = false),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '已归档',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-              itemCount: list.length,
+              itemCount: list.length + (!_showArchived && archivedCount > 0 ? 1 : 0),
               separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (context, i) {
+                if (i == list.length) {
+                  return Material(
+                    color: Colors.transparent,
+                    shape: const StadiumBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => setState(() => _showArchived = true),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.archive_outlined, size: 18, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '已归档 ($archivedCount)',
+                                style: TextStyle(color: cs.onSurfaceVariant, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, size: 18, color: cs.onSurfaceVariant),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }
                 final c = list[i];
                 final selected = store.current == c;
                 return _ConversationTile(
@@ -152,18 +198,9 @@ class _ConversationTile extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          onLongPress: () async {
-            final name = await promptText(
-              context,
-              title: '重命名',
-              initial: conversation.title,
-            );
-            if (name != null && name.trim().isNotEmpty) {
-              store.rename(conversation, name);
-            }
-          },
+          onLongPress: () => _rename(context, store),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: const EdgeInsets.fromLTRB(18, 6, 6, 6),
             child: Row(
               children: [
                 Expanded(
@@ -177,10 +214,34 @@ class _ConversationTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.more_horiz,
+                    size: 20,
+                    color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                  ),
+                  onSelected: (v) {
+                    switch (v) {
+                      case 'rename':
+                        _rename(context, store);
+                      case 'archive':
+                        store.toggleArchive(conversation);
+                      case 'delete':
+                        store.delete(conversation);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'rename', child: Text('重命名')),
+                    PopupMenuItem(
+                      value: 'archive',
+                      child: Text(conversation.archived ? '取消归档' : '归档'),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text('删除', style: TextStyle(color: cs.error)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -188,6 +249,17 @@ class _ConversationTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _rename(BuildContext context, dynamic store) async {
+    final name = await promptText(
+      context,
+      title: '重命名',
+      initial: conversation.title,
+    );
+    if (name != null && name.trim().isNotEmpty) {
+      store.rename(conversation, name);
+    }
   }
 }
 

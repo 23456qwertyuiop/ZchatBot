@@ -56,15 +56,18 @@ class AppStore extends ChangeNotifier {
 
   void newChat() => open(null);
 
-  List<Conversation> filter(String query) {
+  List<Conversation> filter(String query, {bool archived = false}) {
     final q = query.trim().toLowerCase();
-    if (q.isEmpty) return conversations;
-    return conversations
+    final base = conversations.where((c) => c.archived == archived);
+    if (q.isEmpty) return base.toList();
+    return base
         .where((c) =>
             c.title.toLowerCase().contains(q) ||
             c.messages.any((m) => m.content.toLowerCase().contains(q)))
         .toList();
   }
+
+  int get archivedCount => conversations.where((c) => c.archived).length;
 
   // ------------------------------------------------------------------ chat
 
@@ -308,6 +311,13 @@ class AppStore extends ChangeNotifier {
     title = title.trim();
     if (title.isEmpty) return;
     c.title = title;
+    _save(c);
+    notifyListeners();
+  }
+
+  void toggleArchive(Conversation c) {
+    c.archived = !c.archived;
+    if (c.archived && current == c) current = null;
     _save(c);
     notifyListeners();
   }
