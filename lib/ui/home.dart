@@ -215,37 +215,56 @@ class _HomeState extends State<Home> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     spacing: 8,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: IconButton.filledTonal(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.open_in_new, size: 20),
-                            onPressed: _pickAttachments,
-                          ),
-                        ),
-                      ),
                       Expanded(
-                        child: CallbackShortcuts(
-                          bindings: wide
-                              ? {
-                                  const SingleActivator(LogicalKeyboardKey.enter): () {
-                                    if (!streaming) _send(store);
-                                  },
-                                }
-                              : const {},
-                          child: TextField(
-                            controller: _input,
-                            focusNode: _focus,
-                            minLines: 1,
-                            maxLines: 6,
-                            textInputAction: wide ? TextInputAction.none : TextInputAction.newline,
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28)),
-                            ),
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 56),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Theme.of(context).colorScheme.outline),
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          padding: const EdgeInsets.fromLTRB(8, 6, 16, 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            spacing: 8,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 1),
+                                child: SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: IconButton.filledTonal(
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(Icons.open_in_new, size: 20),
+                                    onPressed: _pickAttachments,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: CallbackShortcuts(
+                                  bindings: wide
+                                      ? {
+                                          const SingleActivator(LogicalKeyboardKey.enter): () {
+                                            if (!streaming) _send(store);
+                                          },
+                                        }
+                                      : const {},
+                                  child: TextField(
+                                    controller: _input,
+                                    focusNode: _focus,
+                                    minLines: 1,
+                                    maxLines: 6,
+                                    textInputAction: wide ? TextInputAction.none : TextInputAction.newline,
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
