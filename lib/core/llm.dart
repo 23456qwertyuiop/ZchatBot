@@ -19,6 +19,8 @@ class LlmTurn {
   String _raw = '';
   String _reasoning = '';
   final calls = <ToolCall>[];
+  int inputTokens = 0;
+  int outputTokens = 0;
 
   /// Visible answer, with any inline `<think>` block split out.
   String get text {
@@ -81,6 +83,7 @@ class Llm {
         : {
             'model': model,
             'stream': true,
+            'stream_options': {'include_usage': true},
             'messages': _openaiMessages(system, history),
             if (tools.isNotEmpty)
               'tools': [
@@ -266,6 +269,11 @@ class Llm {
   }
 
   static void _openaiChunk(Map<String, dynamic> j, LlmTurn t, Map<int, ToolCall> b) {
+    final u = j['usage'];
+    if (u is Map) {
+      if (u['prompt_tokens'] is int) t.inputTokens = u['prompt_tokens'];
+      if (u['completion_tokens'] is int) t.outputTokens = u['completion_tokens'];
+    }
     final choices = j['choices'] as List?;
     if (choices == null || choices.isEmpty) return;
     final delta = (choices[0]['delta'] ?? const {}) as Map;
@@ -285,6 +293,11 @@ class Llm {
   }
 
   static void _openaiFull(Map<String, dynamic> j, LlmTurn t) {
+    final u = j['usage'];
+    if (u is Map) {
+      if (u['prompt_tokens'] is int) t.inputTokens = u['prompt_tokens'];
+      if (u['completion_tokens'] is int) t.outputTokens = u['completion_tokens'];
+    }
     final msg = (j['choices'] as List).first['message'] as Map;
     t._raw = msg['content'] ?? '';
     t._reasoning = msg['reasoning_content'] ?? '';
@@ -298,6 +311,12 @@ class Llm {
 
   static void _anthropicChunk(Map<String, dynamic> j, LlmTurn t, Map<int, ToolCall> b) {
     switch (j['type']) {
+      case 'message_start':
+        final u = (j['message'] as Map?)?['usage'];
+        if (u is Map && u['input_tokens'] is int) t.inputTokens = u['input_tokens'];
+      case 'message_delta':
+        final u = j['usage'];
+        if (u is Map && u['output_tokens'] is int) t.outputTokens = u['output_tokens'];
       case 'content_block_start':
         final cb = j['content_block'] as Map;
         if (cb['type'] == 'tool_use') {
@@ -317,6 +336,11 @@ class Llm {
   }
 
   static void _anthropicFull(Map<String, dynamic> j, LlmTurn t) {
+    final u = j['usage'];
+    if (u is Map) {
+      if (u['input_tokens'] is int) t.inputTokens = u['input_tokens'];
+      if (u['output_tokens'] is int) t.outputTokens = u['output_tokens'];
+    }
     for (final c in (j['content'] as List? ?? const [])) {
       if (c['type'] == 'text') t._raw += c['text'];
       if (c['type'] == 'tool_use') {

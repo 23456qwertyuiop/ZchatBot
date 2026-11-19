@@ -68,6 +68,9 @@ class AppStore extends ChangeNotifier {
   }
 
   int get archivedCount => conversations.where((c) => c.archived).length;
+  int get totalInputTokensAll => conversations.fold(0, (s, c) => s + c.totalInputTokens);
+  int get totalOutputTokensAll => conversations.fold(0, (s, c) => s + c.totalOutputTokens);
+  int get totalTokensAll => totalInputTokensAll + totalOutputTokensAll;
 
   // ------------------------------------------------------------------ chat
 
@@ -129,7 +132,9 @@ class AppStore extends ChangeNotifier {
             turn = t;
             msg
               ..content = t.text
-              ..reasoning = t.reasoning;
+              ..reasoning = t.reasoning
+              ..inputTokens = t.inputTokens
+              ..outputTokens = t.outputTokens;
             notifyListeners();
           }
         } on LlmException catch (e) {

@@ -139,6 +139,18 @@ class _HomeState extends State<Home> {
                 const Spacer(),
               ],
               const SizedBox(width: 8),
+              if (conv != null && conv.totalTokens > 0) ...[
+                Tooltip(
+                  message: '输入 ${conv.totalInputTokens} · 输出 ${conv.totalOutputTokens}',
+                  child: Text(
+                    '${_fmtTokens(conv.totalTokens)} tok',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               _ModelButton(store: store),
               if (conv != null) ...[
                 const SizedBox(width: 4),
@@ -480,6 +492,15 @@ class _MessageBubbleState extends State<_MessageBubble> {
                   icon: const Icon(Icons.refresh_rounded),
                   onPressed: widget.onRetry,
                 ),
+                if (m.inputTokens + m.outputTokens > 0) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '↑${m.inputTokens} ↓${m.outputTokens}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                  ),
+                ],
               ],
             ),
         ],
@@ -487,6 +508,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
     );
   }
 }
+
+String _fmtTokens(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
 
 class _ToolPill extends StatelessWidget {
   const _ToolPill({required this.call});

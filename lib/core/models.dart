@@ -125,6 +125,8 @@ class Message {
   List<ToolCall> calls = [];
   List<Attachment> attachments = [];
   bool error = false;
+  int inputTokens = 0;
+  int outputTokens = 0;
 
   Map<String, dynamic> toJson() => {
         'role': role.name,
@@ -133,6 +135,8 @@ class Message {
         if (calls.isNotEmpty) 'calls': calls.map((c) => c.toJson()).toList(),
         if (attachments.isNotEmpty) 'attachments': attachments.map((a) => a.toJson()).toList(),
         if (error) 'error': true,
+        if (inputTokens > 0) 'inputTokens': inputTokens,
+        if (outputTokens > 0) 'outputTokens': outputTokens,
       };
 
   factory Message.fromJson(Map<String, dynamic> j) =>
@@ -146,7 +150,9 @@ class Message {
           for (final a in (j['attachments'] as List? ?? const []))
             Attachment.fromJson(Map<String, dynamic>.from(a))
         ]
-        ..error = j['error'] ?? false;
+        ..error = j['error'] ?? false
+        ..inputTokens = j['inputTokens'] ?? 0
+        ..outputTokens = j['outputTokens'] ?? 0;
 }
 
 class Conversation {
@@ -158,6 +164,10 @@ class Conversation {
   DateTime updated;
   bool archived;
   List<Message> messages = [];
+
+  int get totalInputTokens => messages.fold(0, (s, m) => s + m.inputTokens);
+  int get totalOutputTokens => messages.fold(0, (s, m) => s + m.outputTokens);
+  int get totalTokens => totalInputTokens + totalOutputTokens;
 
   Map<String, dynamic> toJson() => {
         'id': id,

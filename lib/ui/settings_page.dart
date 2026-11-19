@@ -172,6 +172,17 @@ class SettingsPage extends StatelessWidget {
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _importData(context, store),
                     ),
+                    if (store.totalTokensAll > 0) ...[
+                      Divider(height: 1, color: cs.outlineVariant),
+                      ListTile(
+                        leading: const Icon(Icons.data_usage_outlined),
+                        title: const Text('累计 Token'),
+                        trailing: Text(
+                          '↑${store.totalInputTokensAll}  ↓${store.totalOutputTokensAll}',
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
