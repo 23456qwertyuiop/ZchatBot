@@ -1,0 +1,322 @@
+{
+  "groups": [
+    {
+      "id": "1pju1tge",
+      "x": 328,
+      "y": 820,
+      "axis": "x",
+      "items": [
+        {
+          "id": "z9uu8pkh",
+          "kind": "button",
+          "label": "",
+          "icon": "arrow_upward",
+          "variant": "filled",
+          "size": 68
+        }
+      ]
+    },
+    {
+      "id": "68otthui",
+      "x": 16,
+      "y": 820,
+      "axis": "x",
+      "items": [
+        {
+          "id": "o2o3msfx",
+          "kind": "textField",
+          "label": "",
+          "icon": null,
+          "variant": "outlined",
+          "supporting": "",
+          "size": 308
+        }
+      ]
+    },
+    {
+      "id": "c5h2t45s",
+      "x": 1644,
+      "y": 821,
+      "axis": "x",
+      "items": [
+        {
+          "id": "x51ycv7i",
+          "kind": "button",
+          "label": "",
+          "icon": "arrow_upward",
+          "variant": "filled",
+          "size": 68
+        }
+      ]
+    },
+    {
+      "id": "60yw7xdt",
+      "x": 824,
+      "y": 821,
+      "axis": "x",
+      "items": [
+        {
+          "id": "11d9ckww",
+          "kind": "textField",
+          "label": "",
+          "icon": null,
+          "variant": "outlined",
+          "supporting": "",
+          "size": 812
+        }
+      ]
+    },
+    {
+      "id": "5hm3229u",
+      "x": 448,
+      "y": 93,
+      "axis": "x",
+      "items": [
+        {
+          "id": "18i6eep7",
+          "kind": "box",
+          "label": "",
+          "icon": null,
+          "variant": "filled",
+          "size": 364,
+          "size2": 800,
+          "radiusTop": 28,
+          "radiusBottom": 28,
+          "fill": "surfaceContainerHigh"
+        }
+      ]
+    },
+    {
+      "id": "6t1hg8p9",
+      "x": 2,
+      "y": 992,
+      "axis": "x",
+      "items": [
+        {
+          "id": "bse729oq",
+          "kind": "box",
+          "label": "",
+          "icon": null,
+          "variant": "filled",
+          "size": 412,
+          "size2": 892,
+          "radiusTop": 28,
+          "radiusBottom": 28,
+          "fill": "surfaceContainerHigh"
+        }
+      ]
+    },
+    {
+      "id": "7l3zfsjx",
+      "x": 18,
+      "y": 16,
+      "axis": "x",
+      "items": [
+        {
+          "id": "snh2z09c",
+          "kind": "button",
+          "label": "对话名称",
+          "icon": "menu",
+          "variant": "tonal",
+          "size": 156,
+          "action": {
+            "to": "al7p929s",
+            "transition": "slide"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0ay8xjoo",
+      "x": 456,
+      "y": 109,
+      "axis": "y",
+      "items": [
+        {
+          "id": "x25q8257",
+          "kind": "listItem",
+          "label": "对话1",
+          "icon": null,
+          "variant": "filled",
+          "supporting": "",
+          "icon2": "chevron_right",
+          "size": 348
+        }
+      ]
+    },
+    {
+      "id": "aymef14p",
+      "x": 464,
+      "y": 821,
+      "axis": "x",
+      "items": [
+        {
+          "id": "i47v6sdo",
+          "kind": "iconButton",
+          "label": "",
+          "icon": "settings",
+          "variant": "tonal",
+          "size": 56
+        }
+      ]
+    },
+    {
+      "id": "hi5fexwo",
+      "x": 16,
+      "y": 1812,
+      "axis": "x",
+      "items": [
+        {
+          "id": "soqc66gv",
+          "kind": "iconButton",
+          "label": "",
+          "icon": "settings",
+          "variant": "tonal",
+          "size": 56
+        }
+      ]
+    },
+    {
+      "id": "en3udixd",
+      "x": 78,
+      "y": 1812,
+      "axis": "x",
+      "items": [
+        {
+          "id": "dwxrban3",
+          "kind": "searchBar",
+          "label": "搜索",
+          "icon": "search",
+          "variant": "filled",
+          "icon2": "mic",
+          "size": 316
+        }
+      ]
+    },
+    {
+      "id": "jntynl00",
+      "x": 528,
+      "y": 821,
+      "axis": "x",
+      "items": [
+        {
+          "id": "e3bd07cu",
+          "kind": "searchBar",
+          "label": "搜索",
+          "icon": "search",
+          "variant": "filled",
+          "icon2": "mic",
+          "size": 268
+        }
+      ]
+    },
+    {
+      "id": "l2atyeme",
+      "x": 856,
+      "y": 127,
+      "axis": "x",
+      "items": [
+        {
+          "id": "guulp1iu",
+          "kind": "text",
+          "label": "对话名称",
+          "icon": null,
+          "variant": "filled",
+          "size": 28,
+          "bold": true
+        }
+      ]
+    },
+    {
+      "id": "kx3v4vs0",
+      "x": 836,
+      "y": 829,
+      "axis": "x",
+      "items": [
+        {
+          "id": "5wflt9lx",
+          "kind": "iconButton",
+          "label": "",
+          "icon": "open_in_new",
+          "variant": "tonal",
+          "size": 40
+        }
+      ]
+    },
+    {
+      "id": "6mv9v8w2",
+      "x": 12,
+      "y": 1008,
+      "axis": "y",
+      "items": [
+        {
+          "id": "nuaez4id",
+          "kind": "listItem",
+          "label": "对话1",
+          "icon": null,
+          "variant": "filled",
+          "supporting": "",
+          "icon2": "chevron_right",
+          "size": 392,
+          "action": {
+            "to": "lm0dgeen",
+            "transition": "slide"
+          }
+        }
+      ]
+    },
+    {
+      "id": "uwnc4hsm",
+      "x": 24,
+      "y": 828,
+      "axis": "x",
+      "items": [
+        {
+          "id": "cxpqni4y",
+          "kind": "iconButton",
+          "label": "",
+          "icon": "open_in_new",
+          "variant": "tonal",
+          "size": 40
+        }
+      ]
+    }
+  ],
+  "frames": [
+    {
+      "id": "lm0dgeen",
+      "name": "对话框（手机端）",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "63pd1c0r",
+      "name": "对话框+对话历史（电脑/平板端）",
+      "x": 448,
+      "y": 93,
+      "w": 1280,
+      "h": 800,
+      "place": "bottom"
+    },
+    {
+      "id": "al7p929s",
+      "name": "对话历史（手机端） ",
+      "x": 2,
+      "y": 992
+    }
+  ],
+  "paletteKey": "purple",
+  "frame": "phone",
+  "title": "",
+  "brief": "",
+  "dynamicColor": false,
+  "theme": {
+    "dark": false,
+    "bothModes": false,
+    "contrast": "standard",
+    "shape": "full",
+    "font": "roboto",
+    "emphasized": false,
+    "motion": "standard"
+  }
+}
